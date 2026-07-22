@@ -1,0 +1,1394 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-select=none">
+
+<title>RATLEE RACER</title>
+
+
+<style>
+
+body {
+
+    background:#111;
+    color:white;
+    font-family:'Courier New', monospace;
+
+    display:flex;
+    justify-content:center;
+    align-items:center;
+
+    min-height:100vh;
+    margin:0;
+
+    overflow:hidden;
+
+    touch-action:none;
+    user-select:none;
+
+}
+
+
+
+#game-container {
+
+    position:relative;
+
+    width:500px;
+    height:600px;
+
+    box-shadow:0 0 25px black;
+
+    overflow:hidden;
+
+}
+
+
+
+canvas {
+
+    display:block;
+
+    background:#000;
+
+}
+
+
+
+#score-board {
+
+    position:absolute;
+
+    top:20px;
+    left:20px;
+
+    font-size:22px;
+
+    font-weight:bold;
+
+    color:white;
+
+    z-index:10;
+
+    text-shadow:0 0 5px black;
+
+}
+
+
+
+#menu {
+
+    position:absolute;
+
+    top:0;
+    left:0;
+
+    width:100%;
+    height:100%;
+
+    background:rgba(0,0,0,0.9);
+
+    display:flex;
+
+    flex-direction:column;
+
+    justify-content:center;
+
+    align-items:center;
+
+    text-align:center;
+
+    z-index:20;
+
+}
+
+
+
+#menu h1 {
+
+    font-size:42px;
+
+    color:#ff3333;
+
+}
+
+
+
+#menu p {
+
+    color:#ddd;
+
+}
+
+
+
+button {
+
+    padding:12px 35px;
+
+    font-size:20px;
+
+    cursor:pointer;
+
+    background:#222;
+
+    color:white;
+
+    border:2px solid white;
+
+    border-radius:5px;
+
+}
+
+
+
+button:hover {
+
+    background:white;
+
+    color:black;
+
+}
+
+
+
+.touch-zone-container {
+
+    position:absolute;
+
+    width:100%;
+
+    height:100%;
+
+    top:0;
+    left:0;
+
+    display:flex;
+
+    z-index:5;
+
+}
+
+
+
+.touch-left,
+.touch-right {
+
+    width:50%;
+
+    height:100%;
+
+}
+
+
+
+</style>
+
+</head>
+
+
+
+<body>
+
+
+<div id="game-container">
+
+
+<div id="score-board">
+
+SCORE: 0
+
+</div>
+
+
+
+<div class="touch-zone-container">
+
+<div class="touch-left" id="btn-touch-left"></div>
+
+<div class="touch-right" id="btn-touch-right"></div>
+
+</div>
+
+
+
+<canvas id="gameCanvas" width="500" height="600"></canvas>
+
+
+
+<div id="menu">
+
+<h1 id="menu-title">
+
+RATLEE RACER
+
+</h1>
+
+
+<p id="menu-sub">
+
+Avoid traffic and survive!
+
+</p>
+
+
+<p>
+
+Arrow keys / Touch sides to steer
+
+</p>
+
+
+<button onclick="startGame()">
+
+START RACE
+
+</button>
+
+
+</div>
+
+
+</div>
+
+
+
+<script>
+
+
+const canvas =
+document.getElementById("gameCanvas");
+
+
+const ctx =
+canvas.getContext("2d");
+
+
+
+const scoreBoard =
+document.getElementById("score-board");
+
+
+const menu =
+document.getElementById("menu");
+
+
+const menuTitle =
+document.getElementById("menu-title");
+
+
+const menuSub =
+document.getElementById("menu-sub");
+
+
+
+
+let gameActive=false;
+
+let score=0;
+
+let speedMultiplier=1;
+
+let frameCount=0;
+
+let roadOffset=0;
+
+let obstacles=[];
+
+
+let speedPopupTimer=0;
+
+
+
+const basePlayerSpeed=7;
+
+
+
+const player={
+
+x:228,
+
+y:490,
+
+width:45,
+
+height:75,
+
+speed:basePlayerSpeed,
+
+color:"#e60000"
+
+};
+
+
+
+const keys={
+
+ArrowLeft:false,
+
+ArrowRight:false
+
+};
+
+
+
+
+window.addEventListener("keydown",(e)=>{
+
+if(e.key in keys)
+
+keys[e.key]=true;
+
+});
+
+
+
+window.addEventListener("keyup",(e)=>{
+
+if(e.key in keys)
+
+keys[e.key]=false;
+
+});
+
+
+
+
+const leftTouch =
+document.getElementById("btn-touch-left");
+
+const rightTouch =
+document.getElementById("btn-touch-right");
+
+
+
+leftTouch.addEventListener("touchstart",(e)=>{
+
+e.preventDefault();
+
+keys.ArrowLeft=true;
+
+});
+
+
+
+leftTouch.addEventListener("touchend",(e)=>{
+
+e.preventDefault();
+
+keys.ArrowLeft=false;
+
+});
+
+
+
+rightTouch.addEventListener("touchstart",(e)=>{
+
+e.preventDefault();
+
+keys.ArrowRight=true;
+
+});
+
+
+
+rightTouch.addEventListener("touchend",(e)=>{
+
+e.preventDefault();
+
+keys.ArrowRight=false;
+
+});
+
+
+
+function startGame(){
+
+
+obstacles=[];
+
+score=0;
+
+frameCount=0;
+
+speedMultiplier=1;
+
+speedPopupTimer=0;
+
+
+player.x=228;
+
+player.speed=basePlayerSpeed;
+
+
+scoreBoard.innerText="SCORE: 0";
+
+
+menu.style.display="none";
+
+
+gameActive=true;
+
+
+animate();
+
+
+}
+
+
+function createObstacle(){
+
+
+let lanes=[35,130,225,320,415];
+
+
+let lane =
+lanes[Math.floor(Math.random()*lanes.length)];
+
+
+
+let colors=[
+
+"#0055ff",
+"#00aa00",
+"#ffaa00",
+"#ffffff",
+"#9900ff"
+
+];
+
+
+
+let carColor =
+colors[Math.floor(Math.random()*colors.length)];
+
+
+
+obstacles.push({
+
+x:lane,
+
+y:-100,
+
+width:45,
+
+height:75,
+
+speed:4+Math.random()*2,
+
+color:carColor
+
+});
+
+
+}
+
+
+
+
+
+function checkCollision(a,b){
+
+
+return(
+
+a.x < b.x+b.width &&
+
+a.x+a.width > b.x &&
+
+a.y < b.y+b.height &&
+
+a.y+a.height > b.y
+
+);
+
+
+}
+
+
+
+
+
+function gameOver(){
+
+
+gameActive=false;
+
+
+menuTitle.innerText="CRASHED!";
+
+
+menuSub.innerText=
+"Final Score: "+score;
+
+
+menu.style.display="flex";
+
+
+}
+
+
+
+
+
+
+// Normal road car drawing
+
+function drawCar(car){
+
+
+ctx.save();
+
+
+
+// shadow under car
+
+ctx.fillStyle="rgba(0,0,0,0.5)";
+
+ctx.fillRect(
+
+car.x+3,
+
+car.y+5,
+
+car.width,
+
+car.height
+
+);
+
+
+
+
+// main body
+
+ctx.fillStyle=car.color;
+
+
+ctx.beginPath();
+
+
+ctx.roundRect(
+
+car.x,
+
+car.y,
+
+car.width,
+
+car.height,
+
+7
+
+);
+
+
+ctx.fill();
+
+
+
+
+
+
+// roof area
+
+ctx.fillStyle="#222";
+
+
+ctx.beginPath();
+
+
+ctx.roundRect(
+
+car.x+8,
+
+car.y+12,
+
+car.width-16,
+
+30,
+
+5
+
+);
+
+
+ctx.fill();
+
+
+
+
+
+
+// front windshield
+
+ctx.fillStyle="#aeeaff";
+
+
+ctx.fillRect(
+
+car.x+12,
+
+car.y+16,
+
+car.width-24,
+
+10
+
+);
+
+
+
+// rear window
+
+ctx.fillStyle="#8fd4ff";
+
+
+ctx.fillRect(
+
+car.x+12,
+
+car.y+32,
+
+car.width-24,
+
+8
+
+);
+
+
+
+
+
+
+// headlights
+
+ctx.fillStyle="#fff7b0";
+
+
+ctx.fillRect(
+
+car.x+5,
+
+car.y+5,
+
+8,
+
+8
+
+);
+
+
+ctx.fillRect(
+
+car.x+car.width-13,
+
+car.y+5,
+
+8,
+
+8
+
+);
+
+
+
+
+
+
+// bumper
+
+ctx.fillStyle="#111";
+
+
+ctx.fillRect(
+
+car.x+5,
+
+car.y+car.height-12,
+
+car.width-10,
+
+6
+
+);
+
+
+
+
+
+
+
+// wheels
+
+ctx.fillStyle="#050505";
+
+
+// left wheels
+
+ctx.fillRect(
+
+car.x-4,
+
+car.y+15,
+
+7,
+
+18
+
+);
+
+
+ctx.fillRect(
+
+car.x-4,
+
+car.y+50,
+
+7,
+
+18
+
+);
+
+
+// right wheels
+
+ctx.fillRect(
+
+car.x+car.width-3,
+
+car.y+15,
+
+7,
+
+18
+
+);
+
+
+ctx.fillRect(
+
+car.x+car.width-3,
+
+car.y+50,
+
+7,
+
+18
+
+);
+
+
+
+
+
+
+
+// rear lights
+
+ctx.fillStyle="#ff0000";
+
+
+ctx.fillRect(
+
+car.x+5,
+
+car.y+car.height-8,
+
+8,
+
+5
+
+);
+
+
+ctx.fillRect(
+
+car.x+car.width-13,
+
+car.y+car.height-8,
+
+8,
+
+5
+
+);
+
+
+
+ctx.restore();
+
+
+}
+
+
+
+
+
+
+
+function drawSpeedPopup(){
+
+
+if(speedPopupTimer<=0)
+
+return;
+
+
+
+speedPopupTimer--;
+
+
+
+let alpha =
+Math.min(1,speedPopupTimer/20);
+
+
+
+ctx.save();
+
+
+
+ctx.globalAlpha=alpha;
+
+
+
+ctx.font=
+"bold 45px Arial";
+
+
+ctx.textAlign="center";
+
+
+
+ctx.fillStyle="#ffff00";
+
+
+ctx.shadowBlur=20;
+
+ctx.shadowColor="#ff9900";
+
+
+
+ctx.fillText(
+
+"SPEED UP!",
+
+canvas.width/2,
+
+canvas.height/2
+
+);
+
+
+
+ctx.restore();
+
+
+
+}
+function drawRoad(){
+
+
+// black asphalt
+
+ctx.fillStyle="#000000";
+
+ctx.fillRect(
+0,
+0,
+canvas.width,
+canvas.height
+);
+
+
+
+
+// road edges
+
+ctx.strokeStyle="#555";
+
+ctx.lineWidth=5;
+
+
+ctx.beginPath();
+
+
+ctx.moveTo(20,0);
+
+ctx.lineTo(20,canvas.height);
+
+
+ctx.moveTo(480,0);
+
+ctx.lineTo(480,canvas.height);
+
+
+ctx.stroke();
+
+
+
+
+
+// white lane markings
+
+
+ctx.strokeStyle="#ffffff";
+
+ctx.lineWidth=4;
+
+
+
+roadOffset += 6 * speedMultiplier;
+
+
+if(roadOffset>50)
+
+roadOffset=0;
+
+
+
+ctx.beginPath();
+
+
+
+for(
+let y=roadOffset-50;
+y<canvas.height;
+y+=50
+){
+
+
+ctx.moveTo(115,y);
+
+ctx.lineTo(115,y+25);
+
+
+
+ctx.moveTo(210,y);
+
+ctx.lineTo(210,y+25);
+
+
+
+ctx.moveTo(305,y);
+
+ctx.lineTo(305,y+25);
+
+
+
+ctx.moveTo(400,y);
+
+ctx.lineTo(400,y+25);
+
+
+
+}
+
+
+
+ctx.stroke();
+
+
+
+}
+
+
+
+
+
+
+
+function animate(){
+
+
+if(!gameActive)
+
+return;
+
+
+
+
+
+// draw road
+
+drawRoad();
+
+
+
+
+
+// player steering
+
+
+if(
+keys.ArrowLeft &&
+player.x>25
+)
+
+player.x-=player.speed;
+
+
+
+if(
+keys.ArrowRight &&
+player.x<canvas.width-player.width-25
+)
+
+player.x+=player.speed;
+
+
+
+
+
+// draw player
+
+drawCar(player);
+
+
+
+
+
+frameCount++;
+
+
+
+
+
+// create traffic
+
+if(
+frameCount %
+Math.max(
+15,
+Math.floor(65/speedMultiplier)
+)
+===0
+
+)
+
+{
+
+createObstacle();
+
+}
+
+
+
+
+
+
+
+// move traffic
+
+
+for(
+let i=obstacles.length-1;
+i>=0;
+i--
+){
+
+
+
+let car=obstacles[i];
+
+
+
+car.y +=
+car.speed*speedMultiplier;
+
+
+
+
+
+drawCar(car);
+
+
+
+
+
+
+if(
+checkCollision(player,car)
+)
+
+{
+
+gameOver();
+
+return;
+
+}
+
+
+
+
+
+
+
+
+if(
+car.y>canvas.height
+){
+
+
+obstacles.splice(i,1);
+
+
+score+=10;
+
+
+
+scoreBoard.innerText=
+"SCORE: "+score;
+
+
+
+
+
+
+// increase speed every 60 points
+
+
+if(
+score>0 &&
+score%60===0
+
+){
+
+
+speedMultiplier+=0.25;
+
+
+player.speed+=1.2;
+
+
+
+speedPopupTimer=
+Math.floor(0.85*60);
+
+
+
+}
+
+
+}
+
+
+
+
+}
+
+
+
+
+// popup
+
+drawSpeedPopup();
+
+
+
+
+
+requestAnimationFrame(animate);
+
+
+
+}
+// Extra roadside details
+// Adds realistic highway appearance without rain or neon effects
+
+
+function drawRoadside(){
+
+
+// left grass/shoulder
+
+ctx.fillStyle="#1b1b1b";
+
+ctx.fillRect(
+0,
+0,
+20,
+canvas.height
+);
+
+
+// right grass/shoulder
+
+ctx.fillRect(
+480,
+0,
+20,
+canvas.height
+);
+
+
+
+
+// roadside reflectors
+
+for(
+let y=roadOffset-60;
+y<canvas.height;
+y+=100
+){
+
+
+ctx.fillStyle="#ffcc00";
+
+
+ctx.fillRect(
+25,
+y,
+5,
+15
+);
+
+
+ctx.fillRect(
+470,
+y,
+5,
+15
+);
+
+
+
+}
+
+
+
+}
+
+
+
+// Replace road drawing with roadside included
+
+const oldDrawRoad = drawRoad;
+
+
+drawRoad=function(){
+
+
+oldDrawRoad();
+
+
+drawRoadside();
+
+
+};
+
+
+
+
+
+// better crash reset visuals
+
+function resetMenu(){
+
+
+menuTitle.innerText="HIGHWAY RACER";
+
+
+menuTitle.style.color="#ff3333";
+
+
+menuSub.innerText=
+"Avoid traffic and survive!";
+
+
+}
+
+
+
+
+
+// reset menu when starting again
+
+const oldStartGame=startGame;
+
+
+startGame=function(){
+
+
+resetMenu();
+
+
+oldStartGame();
+
+
+};
+// Mobile browser protection
+
+document.addEventListener(
+"touchmove",
+function(e){
+
+e.preventDefault();
+
+},
+{
+passive:false
+}
+);
+
+
+
+// Keep score text visible correctly
+
+function updateScore(){
+
+scoreBoard.innerText=
+"SCORE: "+score;
+
+}
+
+
+
+// Improve crash screen button behavior
+
+menu.addEventListener(
+"click",
+function(){
+
+if(!gameActive){
+
+menuTitle.style.color="#ff3333";
+
+}
+
+});
+
+
+
+// Prevent stuck steering keys
+
+window.addEventListener(
+"blur",
+function(){
+
+keys.ArrowLeft=false;
+
+keys.ArrowRight=false;
+
+});
+
+
+
+// Start the game loop only after loading
+
+console.log(
+"Highway Racer Loaded"
+);
+
+</script>
+
+</body>
+
+</html>
